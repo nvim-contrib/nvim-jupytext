@@ -2,7 +2,7 @@
 local M = {}
 
 -- Run a jupytext command and return its stdout as a Lua string
-M.run_jupytext = function(input, options)
+local jupytext_run = function(input, options)
   local cmd = { "jupytext", input }
 
   for k, v in pairs(options) do
@@ -21,9 +21,24 @@ M.run_jupytext = function(input, options)
   return output
 end
 
+-- Write the file
+local nvim_file_write = function(path, content)
+  local f, err = io.open(path, "w")
+
+  if not f then error("could not open file for writing: " .. err) end
+
+  for _, item in ipairs(content) do
+    -- ensure we write a string
+    f:write(tostring(item))
+    f:write "\n"
+  end
+
+  f:close()
+end
+
 -- Convert an ipynb to a script in memory
-M.read_ipynb = function(ipynb_path, to_format)
-  local content, err = M.run_jupytext(ipynb_path, {
+M.ipynb_file_read = function(ipynb_path, to_format)
+  local content, err = jupytext_run(ipynb_path, {
     ["--to"] = to_format,
     ["--output"] = "-",
   })
@@ -35,7 +50,7 @@ M.read_ipynb = function(ipynb_path, to_format)
 end
 
 -- Read an ipynb metadata
-M.read_ipynb_metadata = function(filename)
+M.ipynb_file_read_metadata = function(filename)
   local language_names = {
     python3 = "python",
   }
@@ -66,11 +81,11 @@ M.read_ipynb_metadata = function(filename)
 end
 
 -- Convert a script to ipynb and write to disk
-M.write_ipynb = function(ipynb_path, ipynb_metadata, script_content)
+M.ipynb_file_write = function(ipynb_path, ipynb_metadata, script_content)
   local script_path = vim.fn.tempname() .. "." .. ipynb_metadata.extension
-  M.nvim_write_file(script_path, script_content)
+  nvim_file_write(script_path, script_content)
 
-  local _, err = M.run_jupytext(script_path, {
+  local _, err = jupytext_run(script_path, {
     ["--update"] = "",
     ["--to"] = "ipynb",
     ["--output"] = ipynb_path,
@@ -80,20 +95,6 @@ M.write_ipynb = function(ipynb_path, ipynb_metadata, script_content)
 
   -- clean up
   vim.fn.delete(script_path)
-end
-
-M.nvim_write_file = function(path, content)
-  local f, err = io.open(path, "w")
-
-  if not f then error("could not open file for writing: " .. err) end
-
-  for _, item in ipairs(content) do
-    -- ensure we write a string
-    f:write(tostring(item))
-    f:write "\n"
-  end
-
-  f:close()
 end
 
 -- Sets the buffer lines without any history
