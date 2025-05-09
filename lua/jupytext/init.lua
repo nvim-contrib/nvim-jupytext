@@ -15,7 +15,7 @@ M.setup = function()
       local file_content = core.read_ipynb(file_path, file_metadata.format)
 
       -- Replace the buffer content with the jupytext content
-      core.nvim_buf_set_line(file_content)
+      core.nvim_buf_set_lines(file_content)
       -- Set the filetype
       vim.api.nvim_command("setlocal fenc=utf-8 ft=" .. file_metadata.language)
     end,
@@ -37,9 +37,7 @@ M.setup = function()
 
       local event = "BufWritePost"
       -- get the corrent event name
-      if ctx.event == "FileWriteCmd" then
-        event = "FileWritePost"
-      end
+      if ctx.event == "FileWriteCmd" then event = "FileWritePost" end
 
       -- trigger the corrent event name
       vim.api.nvim_exec_autocmds(event, { pattern = ctx.match })
@@ -49,7 +47,10 @@ M.setup = function()
   -- If we are using LazyVim make sure to run the LazyFile event so that the LSP
   -- and other important plugins get going
   if pcall(require, "lazy") then
-    vim.api.nvim_exec_autocmds("User", { pattern = "LazyFile", modeline = false })
+    vim.api.nvim_exec_autocmds("User", {
+      pattern = "LazyFile",
+      modeline = false,
+    })
   end
 end
 

@@ -97,7 +97,7 @@ M.nvim_write_file = function(path, content)
 end
 
 -- Sets the buffer lines without any history
-M.nvim_buf_set_line = function(content)
+M.nvim_buf_set_lines = function(content)
   -- Need to add an extra line so that the undo dance that comes later on
   -- doesn't delete the first line of the actual input
   table.insert(content, 1, "")
