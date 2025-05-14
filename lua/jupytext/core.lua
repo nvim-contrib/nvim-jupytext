@@ -23,76 +23,124 @@ end
 
 -- Write the file
 local nvim_file_write = function(path, content)
-  local f, err = io.open(path, "w")
-
-  if not f then error("could not open file for writing: " .. err) end
+  local file, err = io.open(path, "w")
+  if not file then error("Could not open file for writing: " .. err) end
 
   for _, item in ipairs(content) do
     -- ensure we write a string
-    f:write(tostring(item))
-    f:write "\n"
+    file:write(tostring(item))
+    file:write "\n"
   end
 
-  f:close()
+  file:close()
 end
 
 -- Convert an ipynb to a script in memory
-M.ipynb_file_read = function(ipynb_path, to_format)
+M.ipynb_file_read = function(ipynb_path, ipynb_metadata)
+  local ipynb_config = ipynb_metadata.jupytext.text_representation
+  local ipynb_format = ipynb_config.extension .. ":" .. ipynb_config.format_name
+  local ipynb_options = "notebook_metadata_filter=-all"
+
   local content, err = jupytext_run(ipynb_path, {
-    ["--to"] = to_format,
+    ["--to"] = ipynb_format,
+    ["--opt"] = ipynb_options,
     ["--output"] = "-",
   })
 
-  if not content then error(err) end
-
+  if not content then error("Error reading file: " .. err) end
   -- Use opts table for vim.split: { plain = true } to treat separator literally
   return vim.split(content, "\n", { plain = true })
 end
 
 -- Read an ipynb metadata
 M.ipynb_file_read_metadata = function(filename)
-  local language_names = {
-    python3 = "python",
-  }
+  local content = ""
 
-  local language_extensions = {
-    r = "r",
-    R = "r",
-    python = "py",
-    julia = "jl",
-    bash = "sh",
-  }
+  local file = io.open(filename, "r")
+  -- read the file
+  if file then
+    content = file:read "a"
+    -- close the file
+    file:close()
+  end
 
-  local metadata = vim.json.decode(io.open(filename, "r"):read "a")["metadata"]
-  local language = metadata.kernelspec.language
+  -- set the default content
+  if content == "" then content = "{}" end
+  -- decode the content
+  local ok, document = pcall(vim.json.decode, content)
+  if not ok then error("Error decoding file: " .. document) end
 
-  if language == nil then language = language_names[metadata.kernelspec.name] end
+  local metadata = document["metadata"]
+  if not metadata then
+    metadata = {}
+    -- set the document metadata
+    document["metadata"] = metadata
+  end
 
-  local style = "hydrogen"
-  local extension = language_extensions[language]
-  local format = extension .. ":" .. style
+  if not metadata.kernelspec then
+    metadata["kernelspec"] = {}
+    -- set the document metadata
+    document["metadata"] = metadata
+  end
 
-  return {
-    style = style,
-    format = format,
-    language = language,
-    extension = extension,
-  }
+  if not metadata.kernelspec.name then
+    metadata["kernelspec"]["name"] = "python3"
+    -- set the document metadata
+    document["metadata"] = metadata
+  end
+
+  if not metadata.kernelspec.language then
+    metadata["kernelspec"]["language"] = "python"
+    -- set the document metadata
+    document["metadata"] = metadata
+  end
+
+  if not metadata.jupytext then
+    metadata["jupytext"] = {}
+    -- set the document metadata
+    document["metadata"] = metadata
+  end
+
+  if not metadata.jupytext.text_representation then
+    metadata["jupytext"]["text_representation"] = {}
+    -- set the document metadata
+    document["metadata"] = metadata
+  end
+
+  if not metadata.jupytext.text_representation.extension then
+    local extensions = {
+      r = ".r",
+      bash = ".sh",
+      julia = ".jl",
+      python = ".py",
+    }
+    metadata["jupytext"]["text_representation"]["extension"] = extensions[metadata.kernelspec.language]
+    -- set the document metadata
+    document["metadata"] = metadata
+  end
+
+  if not metadata.jupytext.text_representation.format_name then
+    metadata["jupytext"]["text_representation"]["format_name"] = "percent"
+    -- set the document metadata
+    document["metadata"] = metadata
+  end
+
+  return document["metadata"], document["cells"] ~= nil
 end
 
 -- Convert a script to ipynb and write to disk
 M.ipynb_file_write = function(ipynb_path, ipynb_metadata, script_content)
-  local script_path = vim.fn.tempname() .. "." .. ipynb_metadata.extension
+  local script_config = ipynb_metadata.jupytext.text_representation
+  local script_path = vim.fn.tempname() .. script_config.extension
   nvim_file_write(script_path, script_content)
 
   local _, err = jupytext_run(script_path, {
-    ["--update"] = "",
-    ["--to"] = "ipynb",
+    ["--update-metadata"] = vim.json.encode(ipynb_metadata),
     ["--output"] = ipynb_path,
+    ["--to"] = "ipynb",
   })
 
   if err then error(err) end
-
   -- clean up
   vim.fn.delete(script_path)
 end

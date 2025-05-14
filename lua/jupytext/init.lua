@@ -12,13 +12,17 @@ M.setup = function()
     pattern = pattern,
     callback = function(ctx)
       local file_path = vim.fn.resolve(vim.fn.expand(ctx.match))
-      local file_metadata = core.ipynb_file_read_metadata(file_path)
-      local file_content = core.ipynb_file_read(file_path, file_metadata.format)
-
-      -- Replace the buffer content with the jupytext content
-      core.nvim_buf_set_lines(file_content)
+      local file_metadata, ok = core.ipynb_file_read_metadata(file_path)
       -- Set the filetype
-      vim.api.nvim_command("setlocal fenc=utf-8 ft=" .. file_metadata.language)
+      vim.api.nvim_command("setlocal fenc=utf-8 ft=" .. file_metadata.kernelspec.language)
+      -- Set the file metadata
+      vim.api.nvim_buf_set_var(ctx.buf, "file_metadata", file_metadata)
+      -- read the file content
+      if ok then
+        local file_content = core.ipynb_file_read(file_path, file_metadata)
+        -- Replace the buffer content with the jupytext content
+        core.nvim_buf_set_lines(file_content)
+      end
     end,
   })
 
@@ -28,8 +32,8 @@ M.setup = function()
     pattern = pattern,
     callback = function(ctx)
       local file_path = vim.fn.resolve(vim.fn.expand(ctx.match))
-      local file_metadata = core.ipynb_file_read_metadata(file_path)
       local file_content = vim.api.nvim_buf_get_lines(ctx.buf, 0, -1, false)
+      local file_metadata = vim.api.nvim_buf_get_var(ctx.buf, "file_metadata")
 
       -- write the content
       core.ipynb_file_write(file_path, file_metadata, file_content)
