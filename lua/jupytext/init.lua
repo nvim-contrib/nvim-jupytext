@@ -28,7 +28,7 @@ M.setup = function()
     pattern = pattern,
     callback = function(ctx)
       local file_path = vim.fn.resolve(vim.fn.expand(ctx.match))
-      local file_metadata = core.ipynb_read_metadata(file_path)
+      local file_metadata = core.ipynb_file_read_metadata(file_path)
       local file_content = vim.api.nvim_buf_get_lines(ctx.buf, 0, -1, false)
 
       -- write the content
